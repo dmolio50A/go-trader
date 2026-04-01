@@ -4,10 +4,15 @@ Each strategy takes a DataFrame with OHLCV data and returns it with a 'signal' c
 signal: 1 = buy, -1 = sell, 0 = hold
 """
 
+import os
+import sys
 import numpy as np
 import pandas as pd
 from typing import Dict, Any, List, Optional, Callable
 from indicators import sma, ema
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from amd_ifvg import amd_ifvg_core
 
 
 # ─────────────────────────────────────────────
@@ -267,8 +272,20 @@ def pairs_spread_strategy(df: pd.DataFrame, lookback: int = 30, entry_z: float =
     return result
 
 
+@register_strategy(
+    "amd_ifvg",
+    "AMD+IFVG — ICT Accumulation-Manipulation-Distribution with Implied Fair Value Gap (15m, session-aware)",
+    {
+        "asian_start_hour": 0, "asian_end_hour": 8,
+        "london_start_hour": 8, "london_end_hour": 12,
+        "min_ifvg_pct": 0.05, "sweep_threshold_pct": 0.01,
+    }
+)
+def amd_ifvg_strategy(df: pd.DataFrame, **params) -> pd.DataFrame:
+    return amd_ifvg_core(df, **params)
+
+
 if __name__ == "__main__":
-    import sys
     import json
     if "--list-json" in sys.argv:
         print(json.dumps([{"id": name, "description": STRATEGY_REGISTRY[name]["description"]} for name in list_strategies()]))

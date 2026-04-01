@@ -14,8 +14,11 @@ from typing import Dict, List, Optional
 
 # Add shared_strategies/spot/ to path for indicator functions (sma, ema)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'spot'))
+# Add shared_strategies/ for amd_ifvg
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from indicators import sma, ema
+from amd_ifvg import amd_ifvg_core
 
 # ─────────────────────────────────────────────
 # Strategy registry
@@ -146,6 +149,19 @@ def breakout_strategy(df: pd.DataFrame, lookback: int = 20, atr_period: int = 14
     breakout_down = (result["close"] < result["low_roll"].shift(1)) & (tr > result["atr"] * atr_multiplier)
     result.loc[breakout_down & ~breakout_down.shift(1, fill_value=False), "signal"] = -1
     return result
+
+
+@register_strategy(
+    "amd_ifvg",
+    "AMD+IFVG — ICT Accumulation-Manipulation-Distribution with Implied Fair Value Gap (15m, session-aware)",
+    {
+        "asian_start_hour": 0, "asian_end_hour": 8,
+        "london_start_hour": 8, "london_end_hour": 12,
+        "min_ifvg_pct": 0.05, "sweep_threshold_pct": 0.01,
+    }
+)
+def amd_ifvg_strategy(df: pd.DataFrame, **params) -> pd.DataFrame:
+    return amd_ifvg_core(df, **params)
 
 
 if __name__ == "__main__":
