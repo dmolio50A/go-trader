@@ -4,6 +4,7 @@
 - Requires Go 1.26.0 — install via Homebrew: `brew install go@1.26`
 - Go is not in PATH via shell; use `/opt/homebrew/bin/go` directly (e.g. `cd scheduler && /opt/homebrew/bin/go build .`)
 - Python venv at `.venv/bin/python3` (used by executor.go at runtime)
+- In git worktrees, `.venv` is NOT copied — use the main repo's venv: `/Users/richardkuo/Work/openclaw/go-trader/.venv/bin/python3`
 - Python deps managed with `uv` (see `pyproject.toml` / `uv.lock`)
 
 ## Setup
@@ -66,6 +67,7 @@
 - Strategy registry imports: `check_hyperliquid.py` and `check_strategy.py` import from `shared_strategies/spot/strategies.py`; `check_topstep.py` imports from `shared_strategies/futures/strategies.py` — a new strategy must be registered in both if it needs to work across platforms
 - Adding a cross-platform strategy: create core logic in `shared_strategies/<name>.py`, then import+register in both `spot/strategies.py` and `futures/strategies.py` (same pattern as indicators.py)
 - Adding a new spot/futures strategy (no new platform): (1) add `@register_strategy` function to `shared_strategies/spot/strategies.py`, (2) add same to `shared_strategies/futures/strategies.py`, (3) add short name to `knownShortNames` in `scheduler/init.go` — auto-discovery handles all platform configs
+- Spot and futures have independent `STRATEGY_REGISTRY` dicts — a new strategy must be added to both files with `@register_strategy` decorator; perps auto-discovers from spot via `discoverStrategies()`
 - Strategy discovery: `shared_strategies/spot/strategies.py --list-json`, `shared_strategies/options/strategies.py --list-json`, and `shared_strategies/futures/strategies.py --list-json` output JSON arrays of `{"id":..., "description":...}`
 
 ## Build & Deploy
