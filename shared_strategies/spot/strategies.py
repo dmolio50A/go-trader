@@ -246,6 +246,40 @@ def rsi_macd_combo_strategy(df: pd.DataFrame,
 
 
 @register_strategy(
+    "stoch_rsi",
+    "Stochastic RSI — earlier momentum signals via stochastic oscillator on RSI",
+    {"rsi_period": 14, "stoch_period": 14, "k_smooth": 3, "d_smooth": 3,
+     "overbought": 80, "oversold": 20}
+)
+def stoch_rsi_strategy(df: pd.DataFrame,
+                       rsi_period: int = 14, stoch_period: int = 14,
+                       k_smooth: int = 3, d_smooth: int = 3,
+                       overbought: float = 80, oversold: float = 20) -> pd.DataFrame:
+    result = df.copy()
+    # RSI
+    delta = result["close"].diff()
+    gain = delta.clip(lower=0)
+    loss = (-delta).clip(lower=0)
+    avg_gain = gain.ewm(alpha=1/rsi_period, min_periods=rsi_period, adjust=False).mean()
+    avg_loss = loss.ewm(alpha=1/rsi_period, min_periods=rsi_period, adjust=False).mean()
+    rs = avg_gain / avg_loss
+    result["rsi"] = 100 - (100 / (1 + rs))
+    # Stochastic RSI
+    rsi_min = result["rsi"].rolling(window=stoch_period).min()
+    rsi_max = result["rsi"].rolling(window=stoch_period).max()
+    stoch_rsi = (result["rsi"] - rsi_min) / (rsi_max - rsi_min) * 100
+    result["stoch_k"] = stoch_rsi.rolling(window=k_smooth).mean()
+    result["stoch_d"] = result["stoch_k"].rolling(window=d_smooth).mean()
+    # Signals: %K crosses %D in oversold/overbought zones
+    result["signal"] = 0
+    k_cross_up = (result["stoch_k"] > result["stoch_d"]) & (result["stoch_k"].shift(1) <= result["stoch_d"].shift(1))
+    k_cross_down = (result["stoch_k"] < result["stoch_d"]) & (result["stoch_k"].shift(1) >= result["stoch_d"].shift(1))
+    result.loc[k_cross_up & (result["stoch_k"] < oversold), "signal"] = 1
+    result.loc[k_cross_down & (result["stoch_k"] > overbought), "signal"] = -1
+    return result
+
+
+@register_strategy(
     "supertrend",
     "Supertrend — ATR-based trend following with dynamic support/resistance",
     {"atr_period": 10, "multiplier": 3.0}
