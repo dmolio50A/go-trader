@@ -50,6 +50,7 @@ var knownShortNames = map[string]string{
 	"vwap_reversion":     "vwap",
 	"chart_pattern":      "cpat",
 	"liquidity_sweeps":   "liqsw",
+	"parabolic_sar":      "psar",
 }
 
 // deriveShortName returns a short abbreviation for a strategy ID.
@@ -86,6 +87,7 @@ var defaultSpotStrategies = []stratDef{
 	{ID: "vwap_reversion", ShortName: "vwap"},
 	{ID: "chart_pattern", ShortName: "cpat"},
 	{ID: "liquidity_sweeps", ShortName: "liqsw"},
+	{ID: "parabolic_sar", ShortName: "psar"},
 }
 
 var defaultOptionsStrategies = []stratDef{
@@ -113,6 +115,7 @@ var defaultFuturesStrategies = []stratDef{
 	{ID: "vwap_reversion", ShortName: "vwap"},
 	{ID: "chart_pattern", ShortName: "cpat"},
 	{ID: "liquidity_sweeps", ShortName: "liqsw"},
+	{ID: "parabolic_sar", ShortName: "psar"},
 }
 
 // Supported CME futures symbols for the init wizard.
