@@ -48,6 +48,7 @@ var knownShortNames = map[string]string{
 	"ichimoku_cloud":     "ichi",
 	"order_blocks":       "ob",
 	"vwap_reversion":     "vwap",
+	"chart_pattern":      "cpat",
 }
 
 // deriveShortName returns a short abbreviation for a strategy ID.
@@ -82,6 +83,7 @@ var defaultSpotStrategies = []stratDef{
 	{ID: "ichimoku_cloud", ShortName: "ichi"},
 	{ID: "order_blocks", ShortName: "ob"},
 	{ID: "vwap_reversion", ShortName: "vwap"},
+	{ID: "chart_pattern", ShortName: "cpat"},
 }
 
 var defaultOptionsStrategies = []stratDef{
@@ -93,6 +95,7 @@ var defaultOptionsStrategies = []stratDef{
 
 var defaultPerpsStrategies = []stratDef{
 	{ID: "momentum", ShortName: "momentum"},
+	{ID: "chart_pattern", ShortName: "cpat"},
 }
 
 var defaultFuturesStrategies = []stratDef{
@@ -105,6 +108,7 @@ var defaultFuturesStrategies = []stratDef{
 	{ID: "ichimoku_cloud", ShortName: "ichi"},
 	{ID: "order_blocks", ShortName: "ob"},
 	{ID: "vwap_reversion", ShortName: "vwap"},
+	{ID: "chart_pattern", ShortName: "cpat"},
 }
 
 // Supported CME futures symbols for the init wizard.
