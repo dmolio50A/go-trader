@@ -69,6 +69,9 @@
 - Spot and futures have independent `STRATEGY_REGISTRY` dicts — a new strategy must be added to both files with `@register_strategy` decorator; perps auto-discovers from spot via `discoverStrategies()`
 - Strategy discovery: `shared_strategies/spot/strategies.py --list-json`, `shared_strategies/options/strategies.py --list-json`, and `shared_strategies/futures/strategies.py --list-json` output JSON arrays of `{"id":..., "description":...}`
 
+## Pull Requests
+- PR descriptions must reference the related GitHub issue if one exists, using `Closes #<number>` in the body (e.g. `Closes #46`)
+
 ## Build & Deploy
 - Build: `cd scheduler && /opt/homebrew/bin/go build -o ../go-trader .`
 - Restart: `systemctl restart go-trader`
