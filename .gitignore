@@ -13,3 +13,6 @@ logs/
 scheduler/config.json
 scheduler/state.json
 .worktrees/
+
+# macOS
+.DS_Store
