@@ -168,3 +168,78 @@ func TestDiscordChannels_BackwardsCompatJSON(t *testing.T) {
 		t.Errorf("expected ch3, got %s", dc2.Channels["hyperliquid"])
 	}
 }
+
+func TestFormatTradeDM_OpenTrade(t *testing.T) {
+	sc := StrategyConfig{ID: "hl-sma-btc", Platform: "hyperliquid", Type: "perps"}
+	trade := Trade{
+		Symbol:   "BTC",
+		Side:     "buy",
+		Quantity: 0.15,
+		Price:    67845.00,
+		Value:    10176.75,
+		Details:  "Open long 0.150000 @ $67845.00 (fee $10.18)",
+	}
+	msg := FormatTradeDM(sc, trade, "paper")
+
+	if !strings.Contains(msg, "TRADE EXECUTED") {
+		t.Errorf("expected 'TRADE EXECUTED', got:\n%s", msg)
+	}
+	if !strings.Contains(msg, "hl-sma-btc") {
+		t.Errorf("expected strategy ID, got:\n%s", msg)
+	}
+	if !strings.Contains(msg, "BUY") {
+		t.Errorf("expected BUY, got:\n%s", msg)
+	}
+	if !strings.Contains(msg, "Mode: paper") {
+		t.Errorf("expected 'Mode: paper', got:\n%s", msg)
+	}
+	if strings.Contains(msg, "PnL") {
+		t.Errorf("open trade should not contain PnL, got:\n%s", msg)
+	}
+}
+
+func TestFormatTradeDM_CloseTrade(t *testing.T) {
+	sc := StrategyConfig{ID: "hl-rmc-eth", Platform: "hyperliquid", Type: "perps"}
+	trade := Trade{
+		Symbol:   "ETH",
+		Side:     "sell",
+		Quantity: 0.47,
+		Price:    3077.70,
+		Value:    1446.52,
+		Details:  "Close long, PnL: $34.35 (fee $1.23)",
+	}
+	msg := FormatTradeDM(sc, trade, "live")
+
+	if !strings.Contains(msg, "TRADE CLOSED") {
+		t.Errorf("expected 'TRADE CLOSED', got:\n%s", msg)
+	}
+	if !strings.Contains(msg, "SELL") {
+		t.Errorf("expected SELL, got:\n%s", msg)
+	}
+	if !strings.Contains(msg, "PnL: $34.35") {
+		t.Errorf("expected PnL in close trade, got:\n%s", msg)
+	}
+	if !strings.Contains(msg, "Mode: live") {
+		t.Errorf("expected 'Mode: live', got:\n%s", msg)
+	}
+}
+
+func TestFormatTradeDM_FuturesTrade(t *testing.T) {
+	sc := StrategyConfig{ID: "ts-es-scalp", Platform: "topstep", Type: "futures"}
+	trade := Trade{
+		Symbol:   "ES",
+		Side:     "buy",
+		Quantity: 2,
+		Price:    5342.50,
+		Value:    534250.00,
+		Details:  "Open long 2 contracts @ $5342.50 (fee $4.12)",
+	}
+	msg := FormatTradeDM(sc, trade, "paper")
+
+	if !strings.Contains(msg, "Topstep futures") {
+		t.Errorf("expected 'Topstep futures', got:\n%s", msg)
+	}
+	if !strings.Contains(msg, "ES") {
+		t.Errorf("expected ES symbol, got:\n%s", msg)
+	}
+}

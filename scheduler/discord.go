@@ -501,3 +501,39 @@ func collectPositions(stratID string, ss *StrategyState, prices map[string]float
 	}
 	return lines
 }
+
+// FormatTradeDM formats a Trade into a concise DM message for the bot owner.
+func FormatTradeDM(sc StrategyConfig, trade Trade, mode string) string {
+	isClose := strings.Contains(trade.Details, "Close")
+
+	icon := "🟢"
+	header := "TRADE EXECUTED"
+	if isClose {
+		icon = "🔴"
+		header = "TRADE CLOSED"
+	}
+
+	platformLabel := strings.ToUpper(sc.Platform[:1]) + sc.Platform[1:]
+	typeLabel := sc.Type
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("%s **%s**\n", icon, header))
+	sb.WriteString(fmt.Sprintf("Strategy: %s (%s %s)\n", sc.ID, platformLabel, typeLabel))
+	sb.WriteString(fmt.Sprintf("%s — %s %.6g @ $%s\n", trade.Symbol, strings.ToUpper(trade.Side), trade.Quantity, fmtComma(trade.Price)))
+
+	valueLine := fmt.Sprintf("Value: $%s", fmtComma(trade.Value))
+	if isClose {
+		// Extract PnL from Details (e.g. "Close long, PnL: $123.45 (fee $1.23)")
+		if idx := strings.Index(trade.Details, "PnL: $"); idx >= 0 {
+			pnlStr := trade.Details[idx+len("PnL: $"):]
+			if end := strings.Index(pnlStr, " "); end >= 0 {
+				pnlStr = pnlStr[:end]
+			}
+			valueLine += fmt.Sprintf(" | PnL: $%s", pnlStr)
+		}
+	}
+	valueLine += fmt.Sprintf(" | Mode: %s", mode)
+	sb.WriteString(valueLine)
+
+	return sb.String()
+}

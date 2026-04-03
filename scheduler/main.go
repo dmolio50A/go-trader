@@ -554,6 +554,28 @@ func main() {
 							key := ch + "|" + extractAsset(sc)
 							channelTradeDetails[key] = append(channelTradeDetails[key], detail)
 						}
+						// DM trade alert to owner
+						if discord != nil && cfg.Discord.OwnerID != "" {
+							isLive := isLiveArgs(sc.Args)
+							dmEnabled := (isLive && cfg.Discord.DMLiveTrades) || (!isLive && cfg.Discord.DMPaperTrades)
+							if dmEnabled {
+								mode := "paper"
+								if isLive {
+									mode = "live"
+								}
+								mu.RLock()
+								if n := len(stratState.TradeHistory); n > 0 {
+									lastTrade := stratState.TradeHistory[n-1]
+									mu.RUnlock()
+									dmMsg := FormatTradeDM(sc, lastTrade, mode)
+									if err := discord.SendDM(cfg.Discord.OwnerID, dmMsg); err != nil {
+										fmt.Printf("[discord] DM trade alert failed: %v\n", err)
+									}
+								} else {
+									mu.RUnlock()
+								}
+							}
+						}
 					}
 
 					totalTrades += trades
@@ -825,6 +847,16 @@ func executeOptionsResult(sc StrategyConfig, s *StrategyState, result *OptionsRe
 	}
 
 	return trades, detail, harvestDetails
+}
+
+// isLiveArgs reports whether --mode=live appears in strategy args.
+func isLiveArgs(args []string) bool {
+	for _, arg := range args {
+		if arg == "--mode=live" {
+			return true
+		}
+	}
+	return false
 }
 
 // hyperliquidIsLive reports whether --mode=live appears in strategy args.

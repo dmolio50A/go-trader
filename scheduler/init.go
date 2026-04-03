@@ -240,6 +240,8 @@ type InitOptions struct {
 	OptionsChannelID        string            // deprecated: use ChannelMap
 	ChannelMap              map[string]string // keyed by platform/type ("spot", "hyperliquid", "deribit", etc.)
 	AutoUpdate              string            // "off", "daily", "heartbeat" (default: "off")
+	DMPaperTrades           bool              // DM owner on paper trade execution
+	DMLiveTrades            bool              // DM owner on live trade execution
 }
 
 // generateConfig builds a Config from InitOptions. Pure function, no I/O.
@@ -254,9 +256,11 @@ func generateConfig(opts InitOptions) *Config {
 			MaxNotionalUSD: 0,
 		},
 		Discord: DiscordConfig{
-			Enabled:  opts.DiscordEnabled,
-			OwnerID:  opts.DiscordOwnerID,
-			Channels: opts.ChannelMap,
+			Enabled:       opts.DiscordEnabled,
+			OwnerID:       opts.DiscordOwnerID,
+			DMPaperTrades: opts.DMPaperTrades,
+			DMLiveTrades:  opts.DMLiveTrades,
+			Channels:      opts.ChannelMap,
 		},
 		AutoUpdate: opts.AutoUpdate,
 		Platforms:  make(map[string]*PlatformConfig),
@@ -1061,6 +1065,12 @@ func runInit(args []string) int {
 		}
 		discordOwnerID = p.String("Your Discord user ID for DM upgrades (leave blank to skip)", "")
 	}
+	dmLiveTrades := false
+	dmPaperTrades := false
+	if discordEnabled && discordOwnerID != "" {
+		dmLiveTrades = p.YesNo("Send DM on live trade executions?", true)
+		dmPaperTrades = p.YesNo("Send DM on paper trade executions?", false)
+	}
 
 	// Step 10: Auto-update preference.
 	fmt.Println("\n--- Auto-Update ---")
@@ -1167,6 +1177,8 @@ func runInit(args []string) int {
 		DiscordOwnerID:          discordOwnerID,
 		ChannelMap:              channelMap,
 		AutoUpdate:              autoUpdate,
+		DMPaperTrades:           dmPaperTrades,
+		DMLiveTrades:            dmLiveTrades,
 	}
 
 	cfg := generateConfig(opts)
