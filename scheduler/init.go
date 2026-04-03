@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -242,6 +243,10 @@ type InitOptions struct {
 	AutoUpdate              string            // "off", "daily", "heartbeat" (default: "off")
 	DMPaperTrades           bool              // DM owner on paper trade execution
 	DMLiveTrades            bool              // DM owner on live trade execution
+	TelegramEnabled         bool
+	TelegramChatID          int64
+	TelegramDMPaper         bool
+	TelegramDMLive          bool
 }
 
 // generateConfig builds a Config from InitOptions. Pure function, no I/O.
@@ -261,6 +266,12 @@ func generateConfig(opts InitOptions) *Config {
 			DMPaperTrades: opts.DMPaperTrades,
 			DMLiveTrades:  opts.DMLiveTrades,
 			Channels:      opts.ChannelMap,
+		},
+		Telegram: TelegramConfig{
+			Enabled:       opts.TelegramEnabled,
+			ChatID:        opts.TelegramChatID,
+			DMPaperTrades: opts.TelegramDMPaper,
+			DMLiveTrades:  opts.TelegramDMLive,
 		},
 		AutoUpdate: opts.AutoUpdate,
 		Platforms:  make(map[string]*PlatformConfig),
@@ -1072,6 +1083,26 @@ func runInit(args []string) int {
 		dmPaperTrades = p.YesNo("Send DM on paper trade executions?", false)
 	}
 
+	// Step 9b: Telegram.
+	fmt.Println("\n--- Telegram Notifications ---")
+	telegramEnabled := p.YesNo("Enable Telegram trade alerts?", false)
+	var telegramChatID int64
+	telegramDMLive := false
+	telegramDMPaper := false
+	if telegramEnabled {
+		fmt.Println("Set TELEGRAM_BOT_TOKEN env var with your bot token (from @BotFather).")
+		chatIDStr := p.String("Telegram chat ID (send /start to your bot, then check getUpdates)", "")
+		if chatIDStr != "" {
+			if id, err := strconv.ParseInt(chatIDStr, 10, 64); err == nil {
+				telegramChatID = id
+			}
+		}
+		if telegramChatID != 0 {
+			telegramDMLive = p.YesNo("Send Telegram alert on live trade executions?", true)
+			telegramDMPaper = p.YesNo("Send Telegram alert on paper trade executions?", false)
+		}
+	}
+
 	// Step 10: Auto-update preference.
 	fmt.Println("\n--- Auto-Update ---")
 	autoUpdateOptions := []string{
@@ -1179,6 +1210,10 @@ func runInit(args []string) int {
 		AutoUpdate:              autoUpdate,
 		DMPaperTrades:           dmPaperTrades,
 		DMLiveTrades:            dmLiveTrades,
+		TelegramEnabled:         telegramEnabled,
+		TelegramChatID:          telegramChatID,
+		TelegramDMPaper:         telegramDMPaper,
+		TelegramDMLive:          telegramDMLive,
 	}
 
 	cfg := generateConfig(opts)

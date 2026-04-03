@@ -5,17 +5,27 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
 // DiscordConfig holds Discord notification settings.
 type DiscordConfig struct {
-	Enabled      bool              `json:"enabled"`
-	Token        string            `json:"token"`
-	OwnerID      string            `json:"owner_id,omitempty"`       // Discord user ID for DM features (upgrade prompts, config migration)
-	DMPaperTrades bool             `json:"dm_paper_trades,omitempty"` // DM owner on paper trade execution
-	DMLiveTrades  bool             `json:"dm_live_trades,omitempty"`  // DM owner on live trade execution
-	Channels     map[string]string `json:"channels"`                 // keyed by platform or type ("spot", "hyperliquid", "deribit", etc.)
+	Enabled       bool              `json:"enabled"`
+	Token         string            `json:"token"`
+	OwnerID       string            `json:"owner_id,omitempty"`        // Discord user ID for DM features (upgrade prompts, config migration)
+	DMPaperTrades bool              `json:"dm_paper_trades,omitempty"` // DM owner on paper trade execution
+	DMLiveTrades  bool              `json:"dm_live_trades,omitempty"`  // DM owner on live trade execution
+	Channels      map[string]string `json:"channels"`                  // keyed by platform or type ("spot", "hyperliquid", "deribit", etc.)
+}
+
+// TelegramConfig holds Telegram notification settings.
+type TelegramConfig struct {
+	Enabled       bool   `json:"enabled"`
+	Token         string `json:"token"`
+	ChatID        int64  `json:"chat_id,omitempty"`         // Telegram chat ID for trade alerts
+	DMPaperTrades bool   `json:"dm_paper_trades,omitempty"` // send message on paper trade execution
+	DMLiveTrades  bool   `json:"dm_live_trades,omitempty"`  // send message on live trade execution
 }
 
 // PortfolioRiskConfig controls aggregate portfolio-level risk (#42).
@@ -46,6 +56,7 @@ type Config struct {
 	StateFile       string                     `json:"state_file"`
 	StatusToken     string                     `json:"-"` // loaded from STATUS_AUTH_TOKEN env var only
 	Discord         DiscordConfig              `json:"discord"`
+	Telegram        TelegramConfig             `json:"telegram,omitempty"`
 	AutoUpdate      string                     `json:"auto_update,omitempty"` // "off", "daily", "heartbeat" (default: "off")
 	Strategies      []StrategyConfig           `json:"strategies"`
 	PortfolioRisk   *PortfolioRiskConfig       `json:"portfolio_risk,omitempty"`
@@ -120,6 +131,17 @@ func LoadConfig(path string) (*Config, error) {
 	// Discord owner ID from env var takes priority over config file.
 	if ownerID := os.Getenv("DISCORD_OWNER_ID"); ownerID != "" {
 		cfg.Discord.OwnerID = ownerID
+	}
+
+	// Telegram token from env var takes priority over config file.
+	if tgToken := os.Getenv("TELEGRAM_BOT_TOKEN"); tgToken != "" {
+		cfg.Telegram.Token = tgToken
+	}
+	// Telegram chat ID from env var takes priority over config file.
+	if chatIDStr := os.Getenv("TELEGRAM_CHAT_ID"); chatIDStr != "" {
+		if id, err := strconv.ParseInt(chatIDStr, 10, 64); err == nil {
+			cfg.Telegram.ChatID = id
+		}
 	}
 
 	// Optional auth token for the /status HTTP endpoint.

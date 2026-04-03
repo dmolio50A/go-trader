@@ -51,6 +51,34 @@ var configFieldRegistry = []ConfigField{
 		Default:     "false",
 		FieldType:   "bool",
 	},
+	{
+		Version:     4,
+		JSONPath:    "telegram.enabled",
+		Description: "Enable Telegram trade alert notifications (true/false).",
+		Default:     "false",
+		FieldType:   "bool",
+	},
+	{
+		Version:     4,
+		JSONPath:    "telegram.chat_id",
+		Description: "Telegram chat ID for trade alerts. Send /start to your bot, then visit https://api.telegram.org/bot<TOKEN>/getUpdates to find your chat_id.",
+		Default:     "",
+		FieldType:   "int",
+	},
+	{
+		Version:     4,
+		JSONPath:    "telegram.dm_live_trades",
+		Description: "Send a Telegram message on every live trade execution (true/false).",
+		Default:     "true",
+		FieldType:   "bool",
+	},
+	{
+		Version:     4,
+		JSONPath:    "telegram.dm_paper_trades",
+		Description: "Send a Telegram message on every paper trade execution (true/false).",
+		Default:     "false",
+		FieldType:   "bool",
+	},
 }
 
 // NewFieldsSince returns all ConfigFields added after the given version number.

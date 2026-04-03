@@ -126,6 +126,18 @@ func main() {
 		}
 	}
 
+	// Telegram notifier (HTTP-only, no WebSocket needed).
+	var telegram *TelegramNotifier
+	if cfg.Telegram.Enabled && cfg.Telegram.Token != "" && cfg.Telegram.ChatID != 0 {
+		var tgErr error
+		telegram, tgErr = NewTelegramNotifier(cfg.Telegram.Token, cfg.Telegram.ChatID)
+		if tgErr != nil {
+			fmt.Printf("[WARN] Telegram init failed: %v — continuing without Telegram\n", tgErr)
+		} else {
+			fmt.Printf("Telegram bot connected (chat_id=%d)\n", cfg.Telegram.ChatID)
+		}
+	}
+
 	// Config migration: DM owner about new fields if config is behind current version.
 	if cfg.ConfigVersion < CurrentConfigVersion {
 		go runConfigMigrationDM(cfg, discord, *configPath)
@@ -554,25 +566,33 @@ func main() {
 							key := ch + "|" + extractAsset(sc)
 							channelTradeDetails[key] = append(channelTradeDetails[key], detail)
 						}
-						// DM trade alert to owner
-						if discord != nil && cfg.Discord.OwnerID != "" {
-							isLive := isLiveArgs(sc.Args)
-							dmEnabled := (isLive && cfg.Discord.DMLiveTrades) || (!isLive && cfg.Discord.DMPaperTrades)
-							if dmEnabled {
-								mode := "paper"
-								if isLive {
-									mode = "live"
-								}
-								mu.RLock()
-								if n := len(stratState.TradeHistory); n > 0 {
-									lastTrade := stratState.TradeHistory[n-1]
-									mu.RUnlock()
-									dmMsg := FormatTradeDM(sc, lastTrade, mode)
-									if err := discord.SendDM(cfg.Discord.OwnerID, dmMsg); err != nil {
+						// DM trade alerts (Discord + Telegram)
+						isLive := isLiveArgs(sc.Args)
+						mode := "paper"
+						if isLive {
+							mode = "live"
+						}
+						var lastTrade Trade
+						var hasLast bool
+						mu.RLock()
+						if n := len(stratState.TradeHistory); n > 0 {
+							lastTrade = stratState.TradeHistory[n-1]
+							hasLast = true
+						}
+						mu.RUnlock()
+						if hasLast {
+							if discord != nil && cfg.Discord.OwnerID != "" {
+								if (isLive && cfg.Discord.DMLiveTrades) || (!isLive && cfg.Discord.DMPaperTrades) {
+									if err := discord.SendDM(cfg.Discord.OwnerID, FormatTradeDM(sc, lastTrade, mode)); err != nil {
 										fmt.Printf("[discord] DM trade alert failed: %v\n", err)
 									}
-								} else {
-									mu.RUnlock()
+								}
+							}
+							if telegram != nil {
+								if (isLive && cfg.Telegram.DMLiveTrades) || (!isLive && cfg.Telegram.DMPaperTrades) {
+									if err := telegram.SendMessage(FormatTradeDMPlain(sc, lastTrade, mode)); err != nil {
+										fmt.Printf("[telegram] trade alert failed: %v\n", err)
+									}
 								}
 							}
 						}
