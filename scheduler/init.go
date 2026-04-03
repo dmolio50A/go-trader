@@ -233,7 +233,8 @@ type InitOptions struct {
 	OKXPerpsStrategies      []string // selected perps strategy IDs for OKX
 	OKXCapital              float64
 	OKXDrawdown             float64
-	HTFFilter               bool // higher-timeframe trend filter for all strategies
+	CapitalPct              float64 `json:"capitalPct,omitempty"` // 0-1; global capital_pct applied to all strategies
+	HTFFilter               bool    // higher-timeframe trend filter for all strategies
 	DiscordEnabled          bool
 	DiscordOwnerID          string            // Discord user ID for DM features (upgrade prompts, config migration)
 	SpotChannelID           string            // deprecated: use ChannelMap
@@ -540,6 +541,13 @@ func generateConfig(opts InitOptions) *Config {
 			if cfg.Strategies[i].Type != "options" {
 				cfg.Strategies[i].HTFFilter = true
 			}
+		}
+	}
+
+	// #87: Apply capital_pct to all strategies if set globally.
+	if opts.CapitalPct > 0 {
+		for i := range cfg.Strategies {
+			cfg.Strategies[i].CapitalPct = opts.CapitalPct
 		}
 	}
 

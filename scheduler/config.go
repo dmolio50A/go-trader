@@ -82,6 +82,7 @@ type StrategyConfig struct {
 	Script          string              `json:"script"`
 	Args            []string            `json:"args"`
 	Capital         float64             `json:"capital"`
+	CapitalPct      float64             `json:"capital_pct,omitempty"` // 0-1; dynamic capital = wallet_balance * capital_pct (overrides capital)
 	MaxDrawdownPct  float64             `json:"max_drawdown_pct"`
 	IntervalSeconds int                 `json:"interval_seconds,omitempty"` // per-strategy override (0 = use global)
 	HTFFilter       bool                `json:"htf_filter,omitempty"`       // higher-timeframe trend filter
@@ -331,9 +332,19 @@ func ValidateConfig(cfg *Config) error {
 			}
 		}
 
-		// #36: Capital must be > 0.
-		if sc.Capital <= 0 {
-			errs = append(errs, fmt.Sprintf("%s: capital must be > 0, got %g", prefix, sc.Capital))
+		// #87: capital_pct validation.
+		if sc.CapitalPct != 0 {
+			if sc.CapitalPct < 0 || sc.CapitalPct > 1 {
+				errs = append(errs, fmt.Sprintf("%s: capital_pct must be in (0, 1], got %g", prefix, sc.CapitalPct))
+			}
+			if sc.Capital > 0 {
+				fmt.Printf("[WARN] %s: both capital ($%.0f) and capital_pct (%.0f%%) set — capital_pct takes priority\n", sc.ID, sc.Capital, sc.CapitalPct*100)
+			}
+		}
+
+		// #36: Capital must be > 0 (unless capital_pct is set).
+		if sc.Capital <= 0 && sc.CapitalPct == 0 {
+			errs = append(errs, fmt.Sprintf("%s: capital must be > 0 (or set capital_pct), got %g", prefix, sc.Capital))
 		}
 
 		// #36: MaxDrawdownPct must be in (0, 100].

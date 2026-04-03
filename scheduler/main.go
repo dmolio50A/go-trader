@@ -36,11 +36,16 @@ func main() {
 	}
 	ValidateState(state)
 
+	// #87: Resolve capital_pct at startup so initial state gets the right capital.
+	resolveCapitalPct(cfg.Strategies)
+
 	// Initialize new strategies and sync config values for existing ones
 	for i := range cfg.Strategies {
 		sc := &cfg.Strategies[i]
-		// For live Hyperliquid strategies, override capital with the real wallet balance.
-		syncHyperliquidLiveCapital(sc)
+		// For live Hyperliquid strategies without capital_pct, override capital with the real wallet balance.
+		if sc.CapitalPct == 0 {
+			syncHyperliquidLiveCapital(sc)
+		}
 		if s, exists := state.Strategies[sc.ID]; !exists {
 			state.Strategies[sc.ID] = NewStrategyState(*sc)
 			fmt.Printf("  Initialized strategy: %s (type=%s, capital=$%.0f)\n", sc.ID, sc.Type, sc.Capital)
@@ -277,6 +282,9 @@ func main() {
 			}
 			fmt.Println()
 		}
+
+		// #87: Resolve capital_pct → capital for strategies with dynamic sizing.
+		resolveCapitalPct(dueStrategies)
 
 		// Process only due strategies
 		if saveFailures >= 3 {
