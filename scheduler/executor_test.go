@@ -41,7 +41,9 @@ func TestSpotResultJSON(t *testing.T) {
 func TestSpotResultErrorJSON(t *testing.T) {
 	raw := `{"strategy": "sma", "error": "API timeout"}`
 	var result SpotResult
-	json.Unmarshal([]byte(raw), &result)
+	if err := json.Unmarshal([]byte(raw), &result); err != nil {
+		t.Fatal(err)
+	}
 	if result.Error != "API timeout" {
 		t.Errorf("Error = %q, want %q", result.Error, "API timeout")
 	}
