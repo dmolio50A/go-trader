@@ -18,9 +18,13 @@ class TestGetDefaultHtf:
         assert get_default_htf("1h") == "4h"
         assert get_default_htf("4h") == "1d"
 
+    def test_daily_maps_to_weekly(self):
+        assert get_default_htf("1d") == "1w"
+
+    def test_weekly_maps_to_monthly(self):
+        assert get_default_htf("1w") == "1M"
+
     def test_unknown_timeframe_returns_4h(self):
-        assert get_default_htf("1d") == "4h"
-        assert get_default_htf("1w") == "4h"
         assert get_default_htf("bogus") == "4h"
 
 
