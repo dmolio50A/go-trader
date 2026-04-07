@@ -864,3 +864,94 @@ func TestValidateConfig_NoCapitalNoCapitalPct(t *testing.T) {
 		t.Error("expected validation error when neither capital nor capital_pct is set")
 	}
 }
+
+func TestGenerateConfig_DefaultsForOptionalFields(t *testing.T) {
+	// Simulates what the interactive wizard now does: only essential fields are set,
+	// optional fields (notifications, auto-update) use zero-value/defaults.
+	opts := InitOptions{
+		Assets:         []string{"BTC"},
+		EnableSpot:     true,
+		SpotStrategies: []string{"sma_crossover"},
+		SpotCapital:    1000,
+		SpotDrawdown:   5,
+		HTFFilter:      true,
+	}
+	cfg := generateConfig(opts)
+
+	// Notifications should be disabled by default.
+	if cfg.Discord.Enabled {
+		t.Error("expected Discord.Enabled=false by default")
+	}
+	if cfg.Telegram.Enabled {
+		t.Error("expected Telegram.Enabled=false by default")
+	}
+	if cfg.Discord.DMPaperTrades {
+		t.Error("expected Discord.DMPaperTrades=false by default")
+	}
+	if cfg.Discord.DMLiveTrades {
+		t.Error("expected Discord.DMLiveTrades=false by default")
+	}
+	if cfg.Discord.ChannelPaperTrades {
+		t.Error("expected Discord.ChannelPaperTrades=false by default")
+	}
+	if cfg.Discord.ChannelLiveTrades {
+		t.Error("expected Discord.ChannelLiveTrades=false by default")
+	}
+	if cfg.Telegram.DMPaperTrades {
+		t.Error("expected Telegram.DMPaperTrades=false by default")
+	}
+	if cfg.Telegram.DMLiveTrades {
+		t.Error("expected Telegram.DMLiveTrades=false by default")
+	}
+
+	// Auto-update should default to empty (off).
+	if cfg.AutoUpdate != "" {
+		t.Errorf("expected AutoUpdate empty by default, got %q", cfg.AutoUpdate)
+	}
+
+	// HTF filter should be applied.
+	for _, s := range cfg.Strategies {
+		if s.Type != "options" && s.HTFFilter != true {
+			t.Errorf("expected HTFFilter=true for %s", s.ID)
+		}
+	}
+
+	// Strategy should exist with correct defaults.
+	if len(cfg.Strategies) != 1 {
+		t.Fatalf("expected 1 strategy, got %d", len(cfg.Strategies))
+	}
+	if cfg.Strategies[0].Capital != 1000 {
+		t.Errorf("expected capital=1000, got %.0f", cfg.Strategies[0].Capital)
+	}
+}
+
+func TestRunInitFromJSON_DefaultCapitalAndNotifications(t *testing.T) {
+	// Verify that JSON mode with minimal input produces correct config with defaults.
+	out := filepath.Join(t.TempDir(), "config.json")
+	jsonStr := `{"assets":["BTC"],"enableSpot":true,"spotStrategies":["sma_crossover"],"spotCapital":1000,"spotDrawdown":5}`
+	code := runInitFromJSON(jsonStr, out)
+	if code != 0 {
+		t.Fatalf("expected exit 0, got %d", code)
+	}
+	data, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatalf("expected output file: %v", err)
+	}
+	var cfg Config
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		t.Fatalf("output is not valid JSON: %v", err)
+	}
+
+	// Notifications disabled by default.
+	if cfg.Discord.Enabled {
+		t.Error("expected Discord disabled by default in JSON mode")
+	}
+	if cfg.Telegram.Enabled {
+		t.Error("expected Telegram disabled by default in JSON mode")
+	}
+
+	// Auto-update defaults to empty/off.
+	if cfg.AutoUpdate != "" {
+		t.Errorf("expected AutoUpdate empty by default, got %q", cfg.AutoUpdate)
+	}
+}
