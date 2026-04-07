@@ -146,7 +146,7 @@ func TestApiCallDoesNotLeakToken(t *testing.T) {
 		botToken: "secret-test-token-12345",
 		client:   &http.Client{Timeout: 50 * time.Millisecond},
 	}
-	// Call with no server running -- will fail with connection error
+	// Call with no server running — will fail with connection error
 	_, err := tn.apiCall("getMe", nil)
 	if err == nil {
 		t.Fatal("expected error from unreachable server")
