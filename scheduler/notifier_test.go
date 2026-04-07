@@ -308,12 +308,96 @@ func (e *errNotifier) Close() {}
 
 func TestMultiNotifier_SendMessage_ReturnsFirstError(t *testing.T) {
 	mn := NewMultiNotifier(
-		notifierBackend{notifier: &errNotifier{}},
-		notifierBackend{notifier: &mockNotifier{}},
+		notifierBackend{notifier: &errNotifier{}, channels: map[string]string{"spot": "ch1"}},
+		notifierBackend{notifier: &mockNotifier{}, channels: map[string]string{"spot": "ch1"}},
 	)
 
 	err := mn.SendMessage("ch1", "test")
 	if err == nil {
 		t.Error("expected error from first backend")
+	}
+}
+
+func TestMultiNotifier_SendMessage_RoutesPerBackend(t *testing.T) {
+	discord := &mockNotifier{}
+	telegram := &mockNotifier{}
+
+	mn := NewMultiNotifier(
+		notifierBackend{
+			notifier: discord,
+			channels: map[string]string{"spot": "discord-ch1"},
+		},
+		notifierBackend{
+			notifier: telegram,
+			channels: map[string]string{"spot": "telegram-ch1"},
+		},
+	)
+
+	// Sending to a Discord channel should NOT reach Telegram.
+	mn.SendMessage("discord-ch1", "hello discord")
+	if len(discord.messages) != 1 {
+		t.Errorf("expected 1 discord message, got %d", len(discord.messages))
+	}
+	if len(telegram.messages) != 0 {
+		t.Errorf("expected 0 telegram messages, got %d", len(telegram.messages))
+	}
+
+	// Sending to a Telegram channel should NOT reach Discord.
+	mn.SendMessage("telegram-ch1", "hello telegram")
+	if len(discord.messages) != 1 {
+		t.Errorf("expected still 1 discord message, got %d", len(discord.messages))
+	}
+	if len(telegram.messages) != 1 {
+		t.Errorf("expected 1 telegram message, got %d", len(telegram.messages))
+	}
+}
+
+func TestMultiNotifier_SendDM_RoutesPerBackend(t *testing.T) {
+	discord := &mockNotifier{}
+	telegram := &mockNotifier{}
+
+	mn := NewMultiNotifier(
+		notifierBackend{
+			notifier: discord,
+			ownerID:  "discord-owner",
+		},
+		notifierBackend{
+			notifier: telegram,
+			ownerID:  "telegram-owner",
+		},
+	)
+
+	// DM to Discord owner should NOT reach Telegram.
+	mn.SendDM("discord-owner", "hello discord")
+	if len(discord.dms) != 1 {
+		t.Errorf("expected 1 discord DM, got %d", len(discord.dms))
+	}
+	if len(telegram.dms) != 0 {
+		t.Errorf("expected 0 telegram DMs, got %d", len(telegram.dms))
+	}
+
+	// DM to Telegram owner should NOT reach Discord.
+	mn.SendDM("telegram-owner", "hello telegram")
+	if len(discord.dms) != 1 {
+		t.Errorf("expected still 1 discord DM, got %d", len(discord.dms))
+	}
+	if len(telegram.dms) != 1 {
+		t.Errorf("expected 1 telegram DM, got %d", len(telegram.dms))
+	}
+}
+
+func TestMultiNotifier_SendMessage_UnknownChannel(t *testing.T) {
+	mock := &mockNotifier{}
+	mn := NewMultiNotifier(
+		notifierBackend{notifier: mock, channels: map[string]string{"spot": "ch1"}},
+	)
+
+	// Unknown channel ID should not be sent anywhere.
+	err := mn.SendMessage("unknown-channel", "test")
+	if err != nil {
+		t.Errorf("expected nil error for unmatched channel, got %v", err)
+	}
+	if len(mock.messages) != 0 {
+		t.Errorf("expected 0 messages for unknown channel, got %d", len(mock.messages))
 	}
 }

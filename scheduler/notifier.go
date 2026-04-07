@@ -41,24 +41,38 @@ func NewMultiNotifier(backends ...notifierBackend) *MultiNotifier {
 	return &MultiNotifier{backends: valid}
 }
 
-// SendMessage sends content to the given channel/chat ID on all backends.
-// Used when the caller already has a resolved channel ID.
+// SendMessage sends content to backends that own the given channel/chat ID.
+// A backend receives the message only if channelID appears in its channel map.
+// Returns the first error encountered; all per-backend errors are logged.
 func (m *MultiNotifier) SendMessage(channelID string, content string) error {
 	var firstErr error
 	for _, b := range m.backends {
-		if err := b.notifier.SendMessage(channelID, content); err != nil && firstErr == nil {
-			firstErr = err
+		if !backendOwnsChannel(b, channelID) {
+			continue
+		}
+		if err := b.notifier.SendMessage(channelID, content); err != nil {
+			fmt.Printf("[WARN] SendMessage to channel %s failed: %v\n", channelID, err)
+			if firstErr == nil {
+				firstErr = err
+			}
 		}
 	}
 	return firstErr
 }
 
-// SendDM sends content as a direct message on all backends using each backend's owner ID.
+// SendDM sends content as a direct message to backends whose ownerID matches userID.
+// Returns the first error encountered; all per-backend errors are logged.
 func (m *MultiNotifier) SendDM(userID, content string) error {
 	var firstErr error
 	for _, b := range m.backends {
-		if err := b.notifier.SendDM(userID, content); err != nil && firstErr == nil {
-			firstErr = err
+		if b.ownerID != userID {
+			continue
+		}
+		if err := b.notifier.SendDM(userID, content); err != nil {
+			fmt.Printf("[WARN] SendDM to user %s failed: %v\n", userID, err)
+			if firstErr == nil {
+				firstErr = err
+			}
 		}
 	}
 	return firstErr
@@ -107,6 +121,16 @@ func (m *MultiNotifier) OwnerID() string {
 // HasOwner returns true if any backend has an owner configured.
 func (m *MultiNotifier) HasOwner() bool {
 	return m.OwnerID() != ""
+}
+
+// backendOwnsChannel returns true if channelID is one of the backend's configured channel values.
+func backendOwnsChannel(b notifierBackend, channelID string) bool {
+	for _, ch := range b.channels {
+		if ch == channelID {
+			return true
+		}
+	}
+	return false
 }
 
 // SendToChannel sends content to all backends that have a channel configured
