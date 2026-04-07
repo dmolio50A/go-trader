@@ -234,6 +234,9 @@ func main() {
 	saveFailures := 0
 	resetGoroutineRunning := false
 
+	// Track last date leaderboard was auto-posted (UTC) to ensure once-per-day.
+	var lastLeaderboardPostDate string
+
 	// Main loop
 	for {
 		cycleStart := time.Now()
@@ -748,6 +751,22 @@ func main() {
 			fmt.Printf("[WARN] Leaderboard pre-compute failed: %v\n", err)
 		}
 		mu.Unlock()
+
+		// #175: Auto-post daily leaderboard at the configured time.
+		if h, m, ok := ParseLeaderboardPostTime(cfg.LeaderboardPostTime); ok && notifier.HasBackends() {
+			now := time.Now().UTC()
+			today := now.Format("2006-01-02")
+			targetMinute := h*60 + m
+			currentMinute := now.Hour()*60 + now.Minute()
+			if currentMinute >= targetMinute && lastLeaderboardPostDate != today {
+				fmt.Printf("[leaderboard] Auto-posting daily leaderboard (configured time: %s UTC)\n", cfg.LeaderboardPostTime)
+				if err := PostLeaderboard(cfg, notifier); err != nil {
+					fmt.Printf("[WARN] Leaderboard auto-post failed: %v\n", err)
+				} else {
+					lastLeaderboardPostDate = today
+				}
+			}
+		}
 
 		// Periodic update check (heartbeat: every cycle; daily: once per day).
 		if cfg.AutoUpdate == "heartbeat" {
