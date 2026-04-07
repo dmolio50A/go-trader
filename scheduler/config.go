@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -50,19 +51,19 @@ type CorrelationConfig struct {
 
 // Config is the top-level scheduler configuration.
 type Config struct {
-	ConfigVersion      int                        `json:"config_version,omitempty"` // bumped when new fields are added; 0/missing = v1 baseline
-	IntervalSeconds    int                        `json:"interval_seconds"`
-	LogDir             string                     `json:"log_dir"`
-	StateFile          string                     `json:"state_file"`
-	StatusToken        string                     `json:"-"` // loaded from STATUS_AUTH_TOKEN env var only
-	Discord            DiscordConfig              `json:"discord"`
-	Telegram           TelegramConfig             `json:"telegram,omitempty"`
-	AutoUpdate         string                     `json:"auto_update,omitempty"`          // "off", "daily", "heartbeat" (default: "off")
-	LeaderboardPostTime string                    `json:"leaderboard_post_time,omitempty"` // "HH:MM" in UTC; auto-post daily leaderboard at this time (empty = disabled)
-	Strategies         []StrategyConfig           `json:"strategies"`
-	PortfolioRisk      *PortfolioRiskConfig       `json:"portfolio_risk,omitempty"`
-	Correlation        *CorrelationConfig         `json:"correlation,omitempty"`
-	Platforms          map[string]*PlatformConfig `json:"platforms,omitempty"`
+	ConfigVersion       int                        `json:"config_version,omitempty"` // bumped when new fields are added; 0/missing = v1 baseline
+	IntervalSeconds     int                        `json:"interval_seconds"`
+	LogDir              string                     `json:"log_dir"`
+	StateFile           string                     `json:"state_file"`
+	StatusToken         string                     `json:"-"` // loaded from STATUS_AUTH_TOKEN env var only
+	Discord             DiscordConfig              `json:"discord"`
+	Telegram            TelegramConfig             `json:"telegram,omitempty"`
+	AutoUpdate          string                     `json:"auto_update,omitempty"`           // "off", "daily", "heartbeat" (default: "off")
+	LeaderboardPostTime string                     `json:"leaderboard_post_time,omitempty"` // "HH:MM" in UTC; auto-post daily leaderboard at this time (empty = disabled)
+	Strategies          []StrategyConfig           `json:"strategies"`
+	PortfolioRisk       *PortfolioRiskConfig       `json:"portfolio_risk,omitempty"`
+	Correlation         *CorrelationConfig         `json:"correlation,omitempty"`
+	Platforms           map[string]*PlatformConfig `json:"platforms,omitempty"`
 }
 
 // ThetaHarvestConfig controls early exit on sold options.
@@ -257,11 +258,12 @@ func ParseLeaderboardPostTime(s string) (int, int, bool) {
 	if len(parts) != 2 {
 		return 0, 0, false
 	}
-	var h, m int
-	if _, err := fmt.Sscanf(parts[0], "%d", &h); err != nil || h < 0 || h > 23 {
+	h, err := strconv.Atoi(parts[0])
+	if err != nil || h < 0 || h > 23 {
 		return 0, 0, false
 	}
-	if _, err := fmt.Sscanf(parts[1], "%d", &m); err != nil || m < 0 || m > 59 {
+	m, err2 := strconv.Atoi(parts[1])
+	if err2 != nil || m < 0 || m > 59 {
 		return 0, 0, false
 	}
 	return h, m, true

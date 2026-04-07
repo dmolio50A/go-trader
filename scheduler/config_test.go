@@ -434,9 +434,9 @@ func TestValidateConfigPortfolioRisk(t *testing.T) {
 
 func TestParseLeaderboardPostTime(t *testing.T) {
 	tests := []struct {
-		input string
-		wantH int
-		wantM int
+		input  string
+		wantH  int
+		wantM  int
 		wantOK bool
 	}{
 		{"11:00", 11, 0, true},
@@ -450,6 +450,9 @@ func TestParseLeaderboardPostTime(t *testing.T) {
 		{"12", 0, 0, false},
 		{"-1:00", 0, 0, false},
 		{"12:-5", 0, 0, false},
+		{"1a:00", 0, 0, false},
+		{" 5:00", 0, 0, false},
+		{"12:3x", 0, 0, false},
 	}
 	for _, tt := range tests {
 		h, m, ok := ParseLeaderboardPostTime(tt.input)
