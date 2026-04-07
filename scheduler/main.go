@@ -234,6 +234,11 @@ func main() {
 	saveFailures := 0
 	resetGoroutineRunning := false
 
+	var top10Freq time.Duration
+	if cfg.HyperliquidTop10Freq != "" {
+		top10Freq, _ = time.ParseDuration(cfg.HyperliquidTop10Freq)
+	}
+
 	// Main loop
 	for {
 		cycleStart := time.Now()
@@ -737,12 +742,6 @@ func main() {
 		// Save state after each cycle
 		mu.Lock()
 		state.LastCycle = time.Now().UTC()
-		if err := SavePlatformStates(state, cfg); err != nil {
-			saveFailures++
-			fmt.Printf("[CRITICAL] Save state failed (%d/3): %v\n", saveFailures, err)
-		} else {
-			saveFailures = 0
-		}
 		// Pre-compute leaderboard data so the cron job can post without computation.
 		if err := PrecomputeLeaderboard(cfg, state, prices); err != nil {
 			fmt.Printf("[WARN] Leaderboard pre-compute failed: %v\n", err)
@@ -750,13 +749,18 @@ func main() {
 
 		// Periodic hyperliquid top-10 summary (#176).
 		var top10Msg string
-		if cfg.HyperliquidTop10Freq != "" {
-			if freq, err := time.ParseDuration(cfg.HyperliquidTop10Freq); err == nil && time.Since(state.LastTop10Summary) >= freq {
-				top10Msg = FormatHyperliquidTop10(cfg, state, prices)
-				if top10Msg != "" {
-					state.LastTop10Summary = time.Now().UTC()
-				}
+		if top10Freq > 0 && time.Since(state.LastTop10Summary) >= top10Freq {
+			top10Msg = FormatHyperliquidTop10(cfg, state, prices)
+			if top10Msg != "" {
+				state.LastTop10Summary = time.Now().UTC()
 			}
+		}
+
+		if err := SavePlatformStates(state, cfg); err != nil {
+			saveFailures++
+			fmt.Printf("[CRITICAL] Save state failed (%d/3): %v\n", saveFailures, err)
+		} else {
+			saveFailures = 0
 		}
 		mu.Unlock()
 

@@ -470,6 +470,21 @@ func TestValidateConfigHyperliquidTop10FreqTooShort(t *testing.T) {
 	}
 }
 
+func TestValidateConfigHyperliquidTop10FreqValid(t *testing.T) {
+	cfg := Config{
+		HyperliquidTop10Freq: "6h",
+		Strategies: []StrategyConfig{{
+			ID: "test", Type: "spot", Script: "shared_scripts/check_strategy.py",
+			Args: []string{"sma_crossover", "BTC/USDT", "1h"}, Capital: 100, MaxDrawdownPct: 10,
+			Platform: "binanceus",
+		}},
+		PortfolioRisk: &PortfolioRiskConfig{MaxDrawdownPct: 25, WarnThresholdPct: 80},
+	}
+	if err := ValidateConfig(&cfg); err != nil {
+		t.Errorf("expected valid config with HyperliquidTop10Freq=6h, got: %v", err)
+	}
+}
+
 func TestValidateConfigPortfolioRisk(t *testing.T) {
 	cfg := Config{
 		Strategies: []StrategyConfig{{
