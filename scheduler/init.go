@@ -1001,189 +1001,43 @@ func runInit(args []string) int {
 		return 1
 	}
 
-	// Step 8: Capital & risk.
-	fmt.Println("\n--- Capital & Risk ---")
+	// Use sensible defaults for optional fields (capital, risk, notifications, etc.).
+	// Users can customize these post-setup by editing the config or asking OpenClaw.
 	spotCapital := 1000.0
 	optionsCapital := 5000.0
 	perpsCapital := 1000.0
 	spotDrawdown := 5.0
 	optionsDrawdown := 10.0
 	perpsDrawdown := 5.0
-
-	if enableSpot || includePairs {
-		spotCapital = p.Float("Spot/pairs capital per strategy ($)", 1000)
-		spotDrawdown = p.Float("Spot max drawdown (%)", 5)
-	}
-	if enableOptions {
-		optionsCapital = p.Float("Options capital per strategy ($)", 5000)
-		optionsDrawdown = p.Float("Options max drawdown (%)", 10)
-	}
-	if enablePerps {
-		perpsCapital = p.Float("Perps capital per strategy ($)", 1000)
-		perpsDrawdown = p.Float("Perps max drawdown (%)", 5)
-	}
-
 	robinhoodCapital := 500.0
 	robinhoodDrawdown := 5.0
-	if enableRobinhood {
-		robinhoodCapital = p.Float("Robinhood crypto capital per strategy ($)", 500)
-		robinhoodDrawdown = p.Float("Robinhood max drawdown (%)", 5)
-	}
-
 	lunoCapital := 500.0
 	lunoDrawdown := 5.0
-	if enableLuno {
-		lunoCapital = p.Float("Luno capital per strategy ($)", 500)
-		lunoDrawdown = p.Float("Luno max drawdown (%)", 5)
-	}
-
 	futuresCapital := 5000.0
 	futuresDrawdown := 5.0
-	futuresFeePerContract := 0.0
-	if enableFutures {
-		futuresCapital = p.Float("Futures capital per strategy ($)", 5000)
-		futuresDrawdown = p.Float("Futures max drawdown (%)", 5)
-		futuresFeePerContract = p.Float("Futures fee per contract ($)", 1.50)
-	}
-
+	futuresFeePerContract := 1.50
 	okxCapital := 1000.0
 	okxDrawdown := 5.0
-	if enableOKX {
-		okxCapital = p.Float("OKX capital per strategy ($)", 1000)
-		okxDrawdown = p.Float("OKX max drawdown (%)", 5)
-	}
 
-	// Step 9: Discord.
-	fmt.Println("\n--- Discord Notifications ---")
-	discordEnabled := p.YesNo("Enable Discord notifications?", false)
+	// Notifications default to disabled.
+	discordEnabled := false
 	channelMap := make(map[string]string)
 	discordOwnerID := ""
-	if discordEnabled {
-		if enableSpot || includePairs {
-			if ch := p.String("Spot channel ID (leave blank to skip)", ""); ch != "" {
-				channelMap["spot"] = ch
-			}
-		}
-		if enableOptions {
-			for _, plt := range optionPlatforms {
-				if ch := p.String(fmt.Sprintf("%s channel ID (leave blank to skip)", plt), ""); ch != "" {
-					channelMap[plt] = ch
-				}
-			}
-		}
-		if enablePerps {
-			if ch := p.String("Hyperliquid channel ID (leave blank to skip)", ""); ch != "" {
-				channelMap["hyperliquid"] = ch
-			}
-		}
-		if enableFutures {
-			if ch := p.String("TopStep channel ID (leave blank to skip)", ""); ch != "" {
-				channelMap["topstep"] = ch
-			}
-		}
-		if enableRobinhood {
-			if ch := p.String("Robinhood channel ID (leave blank to skip)", ""); ch != "" {
-				channelMap["robinhood"] = ch
-			}
-		}
-		if enableLuno {
-			if ch := p.String("Luno channel ID (leave blank to skip)", ""); ch != "" {
-				channelMap["luno"] = ch
-			}
-		}
-		if enableOKX {
-			if ch := p.String("OKX channel ID (leave blank to skip)", ""); ch != "" {
-				channelMap["okx"] = ch
-			}
-		}
-		discordOwnerID = p.String("Your Discord user ID for DM upgrades (leave blank to skip)", "")
-	}
 	dmLiveTrades := false
 	dmPaperTrades := false
-	if discordEnabled && discordOwnerID != "" {
-		dmLiveTrades = p.YesNo("Send DM on live trade executions?", true)
-		dmPaperTrades = p.YesNo("Send DM on paper trade executions?", false)
-	}
 	channelLiveTrades := false
 	channelPaperTrades := false
-	if discordEnabled && len(channelMap) > 0 {
-		channelLiveTrades = p.YesNo("Post live trade alerts to Discord channel?", false)
-		channelPaperTrades = p.YesNo("Post paper trade alerts to Discord channel?", false)
-	}
-
-	// Step 9b: Telegram.
-	fmt.Println("\n--- Telegram Notifications ---")
-	telegramEnabled := p.YesNo("Enable Telegram notifications?", false)
+	telegramEnabled := false
 	telegramChannelMap := make(map[string]string)
 	telegramOwnerChatID := ""
 	telegramDMLive := false
 	telegramDMPaper := false
 	telegramChannelLive := false
 	telegramChannelPaper := false
-	if telegramEnabled {
-		fmt.Println("Set TELEGRAM_BOT_TOKEN env var with your bot token (from @BotFather).")
-		if enableSpot || includePairs {
-			if ch := p.String("Spot Telegram chat ID (leave blank to skip)", ""); ch != "" {
-				telegramChannelMap["spot"] = ch
-			}
-		}
-		if enableOptions {
-			for _, plt := range optionPlatforms {
-				if ch := p.String(fmt.Sprintf("%s Telegram chat ID (leave blank to skip)", plt), ""); ch != "" {
-					telegramChannelMap[plt] = ch
-				}
-			}
-		}
-		if enablePerps {
-			if ch := p.String("Hyperliquid Telegram chat ID (leave blank to skip)", ""); ch != "" {
-				telegramChannelMap["hyperliquid"] = ch
-			}
-		}
-		if enableFutures {
-			if ch := p.String("TopStep Telegram chat ID (leave blank to skip)", ""); ch != "" {
-				telegramChannelMap["topstep"] = ch
-			}
-		}
-		if enableRobinhood {
-			if ch := p.String("Robinhood Telegram chat ID (leave blank to skip)", ""); ch != "" {
-				telegramChannelMap["robinhood"] = ch
-			}
-		}
-		if enableLuno {
-			if ch := p.String("Luno Telegram chat ID (leave blank to skip)", ""); ch != "" {
-				telegramChannelMap["luno"] = ch
-			}
-		}
-		if enableOKX {
-			if ch := p.String("OKX Telegram chat ID (leave blank to skip)", ""); ch != "" {
-				telegramChannelMap["okx"] = ch
-			}
-		}
-		telegramOwnerChatID = p.String("Your Telegram chat ID for DM upgrades (leave blank to skip)", "")
-		if telegramOwnerChatID != "" {
-			telegramDMLive = p.YesNo("Send Telegram alert on live trade executions?", true)
-			telegramDMPaper = p.YesNo("Send Telegram alert on paper trade executions?", false)
-		}
-		if len(telegramChannelMap) > 0 {
-			telegramChannelLive = p.YesNo("Post live trade alerts to Telegram channel?", false)
-			telegramChannelPaper = p.YesNo("Post paper trade alerts to Telegram channel?", false)
-		}
-	}
 
-	// Step 10: Auto-update preference.
-	fmt.Println("\n--- Auto-Update ---")
-	autoUpdateOptions := []string{
-		"off — manual updates only (default)",
-		"daily — check for updates once per day (DMs owner if configured)",
-		"heartbeat — check for updates every scheduler cycle (DMs owner if configured)",
-	}
-	autoUpdateIdx := p.Choice("Check for new releases automatically?", autoUpdateOptions, 0)
-	autoUpdateModes := []string{"off", "daily", "heartbeat"}
-	autoUpdate := autoUpdateModes[autoUpdateIdx]
-
-	// HTF trend filter.
-	fmt.Println("\n--- HTF Trend Filter ---")
-	htfFilter := p.YesNo("Enable higher-timeframe trend filter? (filters counter-trend signals)", true)
+	// Auto-update defaults to off; HTF filter defaults to enabled.
+	autoUpdate := "off"
+	htfFilter := true
 
 	// Collect all perps strategy IDs (auto-selected, no user prompt).
 	perpsStratIDs := make([]string, len(perpsStrategies))
@@ -1290,11 +1144,10 @@ func runInit(args []string) int {
 
 	cfg := generateConfig(opts)
 
-	// Step 11: Summary + confirm.
+	// Summary + confirm.
 	fmt.Println("\n--- Summary ---")
 	fmt.Printf("Output:     %s\n", outputPath)
 	fmt.Printf("Assets:     %s\n", strings.Join(selectedAssets, ", "))
-	fmt.Printf("Auto-update: %s\n", autoUpdate)
 	fmt.Printf("Strategies: %d\n", len(cfg.Strategies))
 	for _, s := range cfg.Strategies {
 		fmt.Printf("  - %-35s (%s, $%.0f)\n", s.ID, s.Type, s.Capital)
@@ -1317,9 +1170,7 @@ func runInit(args []string) int {
 
 	fmt.Printf("\nConfig written to %s\n", outputPath)
 	fmt.Println("Next steps:")
-	if discordEnabled {
-		fmt.Println("  export DISCORD_BOT_TOKEN=<your-token>")
-	}
+	fmt.Println("  To enable Discord/Telegram notifications, edit the config or ask OpenClaw.")
 	fmt.Printf("  ./go-trader --config %s --once\n", outputPath)
 	return 0
 }
