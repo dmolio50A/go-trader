@@ -434,6 +434,11 @@ func main() {
 						continue
 					}
 
+					// Pre-phase: sync on-chain positions for live Hyperliquid strategies.
+					if sc.Platform == "hyperliquid" && sc.Type == "perps" && hyperliquidIsLive(sc.Args) {
+						syncHyperliquidPositions(sc, stratState, &mu, logger)
+					}
+
 					// Phase 1: RLock — read inputs needed for subprocess
 					mu.RLock()
 					pv := PortfolioValue(stratState, prices)
