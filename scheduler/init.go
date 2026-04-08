@@ -55,6 +55,7 @@ var knownShortNames = map[string]string{
 	"supertrend":            "st",
 	"squeeze_momentum":      "sqm",
 	"heikin_ashi_ema":       "hae",
+	"range_scalper":         "rs",
 }
 
 // deriveShortName returns a short abbreviation for a strategy ID.
@@ -92,6 +93,7 @@ var defaultSpotStrategies = []stratDef{
 	{ID: "chart_pattern", ShortName: "cpat"},
 	{ID: "liquidity_sweeps", ShortName: "liqsw"},
 	{ID: "parabolic_sar", ShortName: "psar"},
+	{ID: "range_scalper", ShortName: "rs"},
 }
 
 var defaultOptionsStrategies = []stratDef{
@@ -106,6 +108,7 @@ var defaultPerpsStrategies = []stratDef{
 	{ID: "chart_pattern", ShortName: "cpat"},
 	{ID: "liquidity_sweeps", ShortName: "liqsw"},
 	{ID: "delta_neutral_funding", ShortName: "dnf"},
+	{ID: "range_scalper", ShortName: "rs"},
 }
 
 var defaultFuturesStrategies = []stratDef{
@@ -122,6 +125,7 @@ var defaultFuturesStrategies = []stratDef{
 	{ID: "liquidity_sweeps", ShortName: "liqsw"},
 	{ID: "parabolic_sar", ShortName: "psar"},
 	{ID: "delta_neutral_funding", ShortName: "dnf"},
+	{ID: "range_scalper", ShortName: "rs"},
 }
 
 // Supported CME futures symbols for the init wizard.

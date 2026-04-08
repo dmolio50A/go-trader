@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from amd_ifvg import amd_ifvg_core
 from chart_patterns import chart_pattern_core
 from liquidity_sweeps import liquidity_sweep_core
+from range_scalper import range_scalper_core
 
 
 # ─────────────────────────────────────────────
@@ -737,6 +738,15 @@ def parabolic_sar_strategy(df: pd.DataFrame, iaf: float = 0.02, af_step: float =
     result.loc[buy, "signal"] = 1
     result.loc[sell, "signal"] = -1
     return result
+
+
+@register_strategy(
+    "range_scalper",
+    "Range Scalper — detects low-volatility consolidation via Bollinger bandwidth + volume, then mean-reverts at band touches",
+    {"bb_period": 14, "bb_std": 1.5, "bw_threshold": 0.008, "vol_ratio": 0.8, "rsi_period": 7, "rsi_ob": 70, "rsi_os": 30}
+)
+def range_scalper_strategy(df: pd.DataFrame, **params) -> pd.DataFrame:
+    return range_scalper_core(df, **params)
 
 
 # Not registered in spot — funding rates are perps-only; check_strategy.py never injects params (#102).

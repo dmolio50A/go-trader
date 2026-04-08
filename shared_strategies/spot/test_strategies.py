@@ -590,6 +590,61 @@ class TestAMDIFVG:
         assert "signal" in result.columns
 
 
+# ─── Range Scalper ─────────────────────────
+
+class TestRangeScalper:
+    def test_signals_in_range_bound_data(self):
+        """Range scalper should produce buy and sell signals in tight oscillating data with low volume."""
+        n = 60
+        rng = np.random.RandomState(123)
+        closes = 100 + 2 * np.sin(np.linspace(0, 6 * np.pi, n)) + rng.randn(n) * 0.2
+        volume = np.full(n, 50.0)
+        df = make_ohlcv(closes, volume=volume, noise=0.3)
+        result = apply_strategy("range_scalper", df, {
+            "bb_period": 10, "bb_std": 1.5, "bw_threshold": 0.02, "vol_ratio": 1.1,
+            "rsi_period": 5, "rsi_ob": 65, "rsi_os": 35,
+        })
+        assert "signal" in result.columns
+        assert "bb_bandwidth" in result.columns
+        assert "in_range" in result.columns
+        assert (result["signal"] == 1).any(), "Expected buy signals at lower band"
+        assert (result["signal"] == -1).any(), "Expected sell signals at upper band"
+
+    def test_no_signals_during_trend(self):
+        """Range scalper should suppress signals during a strong trend (high bandwidth)."""
+        closes = make_trending_up(80)
+        volume = np.full(80, 500.0)
+        df = make_ohlcv(closes, volume=volume)
+        result = apply_strategy("range_scalper", df, {
+            "bb_period": 10, "bb_std": 1.5, "bw_threshold": 0.005,
+            "rsi_period": 7, "rsi_ob": 70, "rsi_os": 30,
+        })
+        assert result["in_range"].sum() < len(result) * 0.3, "Expected few in_range=True bars during trend"
+
+    def test_columns_present(self):
+        """Check all diagnostic columns are present."""
+        df = make_ohlcv(make_volatile(50))
+        result = apply_strategy("range_scalper", df)
+        for col in ["bb_mid", "bb_upper", "bb_lower", "bb_bandwidth", "vol_sma",
+                     "low_volume", "in_range", "rsi", "signal"]:
+            assert col in result.columns, f"Missing column: {col}"
+
+    def test_no_repeated_signals(self):
+        """Crossover guard should prevent consecutive identical signals."""
+        n = 60
+        rng = np.random.RandomState(123)
+        closes = 100 + 2 * np.sin(np.linspace(0, 6 * np.pi, n)) + rng.randn(n) * 0.2
+        volume = np.full(n, 50.0)
+        df = make_ohlcv(closes, volume=volume, noise=0.3)
+        result = apply_strategy("range_scalper", df, {
+            "bb_period": 10, "bb_std": 1.5, "bw_threshold": 0.02, "vol_ratio": 1.1,
+            "rsi_period": 5, "rsi_ob": 65, "rsi_os": 35,
+        })
+        signals = result[result["signal"] != 0]["signal"]
+        consecutive_same = (signals == signals.shift(1)).sum()
+        assert consecutive_same <= 1, f"Too many consecutive same signals ({consecutive_same}), crossover guard may be broken"
+
+
 # ─── Edge Cases (all strategies) ────────────
 
 class TestEdgeCases:
@@ -597,7 +652,7 @@ class TestEdgeCases:
         "sma_crossover", "ema_crossover", "rsi", "bollinger_bands", "macd",
         "mean_reversion", "momentum", "volume_weighted", "triple_ema",
         "rsi_macd_combo", "stoch_rsi", "supertrend", "atr_breakout",
-        "heikin_ashi_ema", "parabolic_sar", "amd_ifvg",
+        "heikin_ashi_ema", "parabolic_sar", "amd_ifvg", "range_scalper",
     ])
     def test_empty_dataframe(self, name):
         """All strategies should handle empty DataFrames without crashing."""
@@ -609,7 +664,7 @@ class TestEdgeCases:
         "sma_crossover", "ema_crossover", "rsi", "bollinger_bands", "macd",
         "mean_reversion", "momentum", "volume_weighted", "triple_ema",
         "rsi_macd_combo", "stoch_rsi", "atr_breakout",
-        "heikin_ashi_ema", "amd_ifvg",
+        "heikin_ashi_ema", "amd_ifvg", "range_scalper",
     ])
     def test_single_row(self, name):
         """All strategies should handle a single-row DataFrame."""
