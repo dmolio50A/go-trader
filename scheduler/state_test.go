@@ -342,6 +342,84 @@ func TestSaveStateWithDB_Error(t *testing.T) {
 	}
 }
 
+func TestLoadStateWithDB_DuplicateStrategyMigration(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "state.db")
+
+	// Create two platform state files with overlapping strategy IDs.
+	hlDir := filepath.Join(dir, "platforms", "hyperliquid")
+	buDir := filepath.Join(dir, "platforms", "binanceus")
+	if err := os.MkdirAll(hlDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(buDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Both files contain strategy "hl-sma-btc" — simulates the monolithic
+	// state.json being copied into per-platform files.
+	hlState := &AppState{
+		CycleCount: 5,
+		Strategies: map[string]*StrategyState{
+			"hl-sma-btc": {ID: "hl-sma-btc", Type: "perps", Cash: 500, InitialCapital: 1000,
+				Positions: make(map[string]*Position), OptionPositions: make(map[string]*OptionPosition), TradeHistory: []Trade{}},
+		},
+	}
+	buState := &AppState{
+		CycleCount: 5,
+		Strategies: map[string]*StrategyState{
+			"hl-sma-btc": {ID: "hl-sma-btc", Type: "perps", Cash: 600, InitialCapital: 1000,
+				Positions: make(map[string]*Position), OptionPositions: make(map[string]*OptionPosition), TradeHistory: []Trade{}},
+			"bu-rsi-eth": {ID: "bu-rsi-eth", Type: "spot", Cash: 800, InitialCapital: 1000,
+				Positions: make(map[string]*Position), OptionPositions: make(map[string]*OptionPosition), TradeHistory: []Trade{}},
+		},
+	}
+	writeTestJSON(t, filepath.Join(hlDir, "state.json"), hlState)
+	writeTestJSON(t, filepath.Join(buDir, "state.json"), buState)
+
+	db, err := OpenStateDB(dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	cfg := &Config{
+		StateFile: filepath.Join(dir, "state.json"), // does not exist
+		Platforms: map[string]*PlatformConfig{
+			"hyperliquid": {StateFile: filepath.Join(hlDir, "state.json")},
+			"binanceus":   {StateFile: filepath.Join(buDir, "state.json")},
+		},
+	}
+
+	loaded, err := LoadStateWithDB(cfg, db)
+	if err != nil {
+		t.Fatalf("LoadStateWithDB: %v", err)
+	}
+
+	// Should have 2 unique strategies (duplicate hl-sma-btc merged).
+	if len(loaded.Strategies) != 2 {
+		t.Errorf("expected 2 strategies, got %d", len(loaded.Strategies))
+	}
+	if _, ok := loaded.Strategies["hl-sma-btc"]; !ok {
+		t.Error("missing strategy hl-sma-btc")
+	}
+	if _, ok := loaded.Strategies["bu-rsi-eth"]; !ok {
+		t.Error("missing strategy bu-rsi-eth")
+	}
+
+	// Verify SQLite has the migrated data.
+	dbState, err := db.LoadState()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dbState == nil {
+		t.Fatal("SQLite should have data after migration")
+	}
+	if len(dbState.Strategies) != 2 {
+		t.Errorf("SQLite strategies = %d, want 2", len(dbState.Strategies))
+	}
+}
+
 func TestNewStrategyState_ConfigInitialCapital(t *testing.T) {
 	// When config has InitialCapital set, it should be used instead of Capital.
 	cfg := StrategyConfig{

@@ -153,11 +153,15 @@ func loadJSONPlatformStates(cfg *Config) (*AppState, error) {
 		if err != nil {
 			return nil, fmt.Errorf("platform %s: %w", name, err)
 		}
-		for id, stratState := range s.Strategies {
+		for _, stratState := range s.Strategies {
 			if stratState.Platform == "" {
 				stratState.Platform = name
 			}
-			merged.Strategies[id] = stratState
+			if _, dup := merged.Strategies[stratState.ID]; dup {
+				fmt.Printf("[state] skipping duplicate strategy %s from %s\n", stratState.ID, stateFile)
+				continue
+			}
+			merged.Strategies[stratState.ID] = stratState
 		}
 		if merged.CycleCount < s.CycleCount {
 			merged.CycleCount = s.CycleCount
