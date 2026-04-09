@@ -179,7 +179,7 @@ func (sdb *StateDB) SaveState(state *AppState) error {
 	}
 
 	// 3. Insert strategies with flattened risk state.
-	stmtStrat, err := tx.Prepare(`INSERT INTO strategies (id, type, platform, cash, initial_capital,
+	stmtStrat, err := tx.Prepare(`INSERT OR REPLACE INTO strategies (id, type, platform, cash, initial_capital,
 		risk_peak_value, risk_max_drawdown_pct, risk_current_drawdown_pct,
 		risk_daily_pnl, risk_daily_pnl_date, risk_consecutive_losses,
 		risk_circuit_breaker, risk_circuit_breaker_until,

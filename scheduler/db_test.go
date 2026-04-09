@@ -612,6 +612,51 @@ func TestCorrelationSnapshotRoundTrip(t *testing.T) {
 	}
 }
 
+func TestSaveState_DuplicateStrategyIDs(t *testing.T) {
+	db := openTestDB(t)
+
+	// Simulate the bug from issue #207: two map entries with different keys
+	// but the same s.ID. This happens when loadJSONPlatformStates merges
+	// overlapping platform state files.
+	state := &AppState{
+		CycleCount: 1,
+		Strategies: map[string]*StrategyState{
+			"hl-sma-btc": {
+				ID: "hl-sma-btc", Type: "perps", Platform: "hyperliquid",
+				Cash: 500, InitialCapital: 1000,
+				Positions:       map[string]*Position{"BTC": {Symbol: "BTC", Quantity: 0.1, AvgCost: 50000, Side: "long"}},
+				OptionPositions: make(map[string]*OptionPosition),
+				TradeHistory:    []Trade{},
+			},
+			"hl-sma-btc-dup": {
+				ID: "hl-sma-btc", Type: "perps", Platform: "hyperliquid",
+				Cash: 600, InitialCapital: 1000,
+				Positions:       map[string]*Position{"BTC": {Symbol: "BTC", Quantity: 0.2, AvgCost: 51000, Side: "long"}},
+				OptionPositions: make(map[string]*OptionPosition),
+				TradeHistory:    []Trade{},
+			},
+		},
+	}
+
+	// Before the fix, this would fail with UNIQUE constraint violation.
+	if err := db.SaveState(state); err != nil {
+		t.Fatalf("SaveState with duplicate IDs should not error: %v", err)
+	}
+
+	loaded, err := db.LoadState()
+	if err != nil {
+		t.Fatalf("LoadState: %v", err)
+	}
+
+	// One of the two entries wins (last-write-wins); verify only one strategy in DB.
+	if len(loaded.Strategies) != 1 {
+		t.Errorf("expected 1 strategy after dedup, got %d", len(loaded.Strategies))
+	}
+	if _, ok := loaded.Strategies["hl-sma-btc"]; !ok {
+		t.Error("expected strategy hl-sma-btc to exist")
+	}
+}
+
 func TestSaveState_EmptyStrategies(t *testing.T) {
 	db := openTestDB(t)
 	state := &AppState{
