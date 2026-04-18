@@ -155,8 +155,9 @@ func TestReconcileUpdatesExistingOwnedPosition(t *testing.T) {
 
 func TestReconcileRemoveClosedPosition(t *testing.T) {
 	s := &StrategyState{
-		ID:   "hl-btc",
-		Cash: 5000,
+		ID:           "hl-btc",
+		Cash:         5000,
+		TradeHistory: []Trade{},
 		Positions: map[string]*Position{
 			"BTC": {Symbol: "BTC", Quantity: 0.5, AvgCost: 40000, Side: "long", OwnerStrategyID: "hl-btc"},
 		},
@@ -172,9 +173,20 @@ func TestReconcileRemoveClosedPosition(t *testing.T) {
 	if _, ok := s.Positions["BTC"]; ok {
 		t.Error("BTC position should have been removed")
 	}
-	// Cash should not change.
-	if s.Cash != 5000 {
-		t.Errorf("cash = %g, want 5000", s.Cash)
+	// Cash should be credited back: 5000 + 0.5*40000 = 25000.
+	wantCash := 5000.0 + 0.5*40000.0
+	if s.Cash != wantCash {
+		t.Errorf("cash = %g, want %g (proceeds credited at entry price)", s.Cash, wantCash)
+	}
+	// A close trade should have been recorded.
+	if len(s.TradeHistory) != 1 {
+		t.Fatalf("expected 1 trade in history; got %d", len(s.TradeHistory))
+	}
+	if s.TradeHistory[0].Side != "close" {
+		t.Errorf("trade side = %q, want \"close\"", s.TradeHistory[0].Side)
+	}
+	if s.TradeHistory[0].Value != 0.5*40000 {
+		t.Errorf("trade value = %g, want %g", s.TradeHistory[0].Value, 0.5*40000.0)
 	}
 }
 

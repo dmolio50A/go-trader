@@ -178,9 +178,27 @@ func reconcileHyperliquidPositions(stratState *StrategyState, sym string, positi
 			changed = true
 		}
 	} else if onChainPos == nil && statePos != nil {
-		// Position in state but not on-chain — closed externally.
-		logger.Info("hl-sync: %s position (%.6f %s) no longer on-chain, removing",
-			sym, statePos.Quantity, statePos.Side)
+		// Position in state but not on-chain — closed externally (stop-out, liquidation, manual close).
+		// Credit back AvgCost * Quantity so cash is not lost from local state.
+		// We don't know the actual exit price, so we settle at entry price (PnL=0).
+		// The real P&L already happened on-chain; this keeps local capital accounting consistent.
+		proceeds := statePos.Quantity * statePos.AvgCost
+		logger.Info("hl-sync: %s position (%.6f %s @ $%.2f) no longer on-chain — crediting $%.2f back to cash",
+			sym, statePos.Quantity, statePos.Side, statePos.AvgCost, proceeds)
+		stratState.Cash += proceeds
+		trade := Trade{
+			Timestamp:  time.Now().UTC(),
+			StrategyID: stratState.ID,
+			Symbol:     sym,
+			Side:       "close",
+			Quantity:   statePos.Quantity,
+			Price:      statePos.AvgCost,
+			Value:      proceeds,
+			TradeType:  "perps",
+			Details:    "hl-sync: externally closed (stop-out/liquidation/manual) — settled at entry price",
+		}
+		stratState.TradeHistory = append(stratState.TradeHistory, trade)
+		RecordTradeResult(&stratState.RiskState, 0)
 		delete(stratState.Positions, sym)
 		changed = true
 	}
