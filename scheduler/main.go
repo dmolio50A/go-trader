@@ -412,6 +412,23 @@ func main() {
 
 				mu.Lock()
 				state.CorrelationSnapshot = corrSnap
+				// Translate asset concentration into per-strategy sizing multipliers.
+				// Strategies targeting a highly concentrated asset trade smaller next cycle.
+				for _, sc := range cfg.Strategies {
+					asset := extractAsset(sc)
+					mult := 1.0
+					if ae, ok := corrSnap.Assets[asset]; ok {
+						switch {
+						case ae.ConcentrationPct > 50:
+							mult = 0.50
+						case ae.ConcentrationPct > cfg.Correlation.MaxConcentrationPct*0.75:
+							mult = 0.75
+						}
+					}
+					if s, ok := state.Strategies[sc.ID]; ok {
+						s.PositionSizeMult = mult
+					}
+				}
 				mu.Unlock()
 			}
 

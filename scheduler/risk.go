@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"time"
 )
 
@@ -137,6 +138,8 @@ type RiskState struct {
 	TotalTrades         int       `json:"total_trades"`
 	WinningTrades       int       `json:"winning_trades"`
 	LosingTrades        int       `json:"losing_trades"`
+	TotalWinUSD         float64   `json:"total_win_usd,omitempty"`  // cumulative gross profit across all winning trades
+	TotalLossUSD        float64   `json:"total_loss_usd,omitempty"` // cumulative gross loss (positive value) across all losing trades
 }
 
 // rolloverDailyPnL resets DailyPnL to zero whenever the UTC date has advanced
@@ -287,8 +290,62 @@ func RecordTradeResult(r *RiskState, pnl float64) {
 	if pnl >= 0 {
 		r.WinningTrades++
 		r.ConsecutiveLosses = 0
+		r.TotalWinUSD += pnl
 	} else {
 		r.LosingTrades++
 		r.ConsecutiveLosses++
+		r.TotalLossUSD += math.Abs(pnl)
 	}
+}
+
+// ComputePositionSizeFraction returns the fraction of available cash to allocate for a new position.
+//
+// Layers applied in order:
+//  1. Kelly Criterion (quarter-Kelly, kicks in after 30 closed trades)
+//  2. Drawdown scaling (reduces size as current drawdown grows)
+//  3. Correlation multiplier (caller supplies 0–1 based on asset concentration)
+//
+// The result is clamped to [0.05, 0.95].
+func ComputePositionSizeFraction(r *RiskState, corrMult float64) float64 {
+	const (
+		baseFraction   = 0.95
+		kellyMinTrades = 30
+		kellyWeight    = 0.25 // quarter-Kelly for safety
+	)
+
+	if corrMult <= 0 {
+		corrMult = 1.0
+	}
+
+	fraction := baseFraction
+
+	// Kelly Criterion: only activate after enough closed trades to be statistically meaningful.
+	if r.TotalTrades >= kellyMinTrades && r.WinningTrades > 0 && r.LosingTrades > 0 {
+		avgWin := r.TotalWinUSD / float64(r.WinningTrades)
+		avgLoss := r.TotalLossUSD / float64(r.LosingTrades)
+		if avgWin > 0 && avgLoss > 0 {
+			winRate := float64(r.WinningTrades) / float64(r.TotalTrades)
+			// Kelly formula: f* = (W*b - L) / b, where b = avg_win / avg_loss
+			b := avgWin / avgLoss
+			kelly := (winRate*b - (1 - winRate)) / b
+			if kelly > 0 {
+				fraction = math.Min(fraction, kelly*kellyWeight)
+			} else {
+				// Negative Kelly = negative expectancy → trade minimum to preserve capital.
+				fraction = 0.05
+			}
+		}
+	}
+	// Drawdown scaling: step down size as account draws down from its peak.
+	switch {
+	case r.CurrentDrawdownPct > 20:
+		fraction *= 0.50
+	case r.CurrentDrawdownPct > 10:
+		fraction *= 0.75
+	}
+
+	// Correlation multiplier from caller (asset concentration check).
+	fraction *= corrMult
+
+	return math.Max(0.05, math.Min(baseFraction, fraction))
 }

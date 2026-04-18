@@ -99,8 +99,8 @@ func ExecuteSpotSignal(s *StrategyState, signal int, symbol string, price float6
 			logger.Info("Closed short %s @ $%.2f (fee $%.2f) | PnL: $%.2f", symbol, execPrice, fee, pnl)
 			tradesExecuted++
 		}
-		// Open long — use 95% of cash
-		budget := s.Cash * 0.95
+		// Open long — dynamic position sizing (Kelly + drawdown + correlation).
+		budget := s.Cash * ComputePositionSizeFraction(&s.RiskState, s.PositionSizeMult)
 		if budget < 1 {
 			logger.Info("Insufficient cash ($%.2f) to buy %s", s.Cash, symbol)
 			return tradesExecuted, nil
@@ -206,8 +206,8 @@ func ExecuteFuturesSignal(s *StrategyState, signal int, symbol string, price flo
 			logger.Info("Closed short %s %d contracts @ $%.2f (fee $%.2f) | PnL: $%.2f", symbol, contracts, execPrice, fee, pnl)
 			tradesExecuted++
 		}
-		// Open long — whole contracts only
-		budget := s.Cash * 0.95
+		// Open long — whole contracts; dynamic position sizing (Kelly + drawdown + correlation).
+		budget := s.Cash * ComputePositionSizeFraction(&s.RiskState, s.PositionSizeMult)
 		if budget < 1 || price <= 0 || multiplier <= 0 {
 			logger.Info("Insufficient cash ($%.2f) to buy %s futures", s.Cash, symbol)
 			return tradesExecuted, nil
@@ -278,7 +278,7 @@ func ExecuteFuturesSignal(s *StrategyState, signal int, symbol string, price flo
 		}
 		// Open short if no long was closed or after closing long
 		if _, exists := s.Positions[symbol]; !exists {
-			budget := s.Cash * 0.95
+			budget := s.Cash * ComputePositionSizeFraction(&s.RiskState, s.PositionSizeMult)
 			if budget < 1 || price <= 0 || multiplier <= 0 {
 				logger.Info("Insufficient cash ($%.2f) to short %s futures", s.Cash, symbol)
 				return tradesExecuted, nil

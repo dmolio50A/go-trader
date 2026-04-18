@@ -32,6 +32,10 @@ type StrategyState struct {
 	OptionPositions map[string]*OptionPosition `json:"option_positions"`
 	TradeHistory    []Trade                    `json:"trade_history"`
 	RiskState       RiskState                  `json:"risk_state"`
+	// PositionSizeMult is a runtime-only multiplier (0–1) set each cycle by the
+	// correlation checker to reduce position size when asset concentration is high.
+	// Not persisted to JSON (recomputed every cycle).
+	PositionSizeMult float64 `json:"-"`
 }
 
 func NewStrategyState(cfg StrategyConfig) *StrategyState {

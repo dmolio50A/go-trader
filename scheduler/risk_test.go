@@ -496,3 +496,136 @@ func TestCheckPortfolioRisk_EventLoggedOnTrigger(t *testing.T) {
 		t.Errorf("expected portfolio_value=7400; got %.2f", prs.Events[0].PortfolioValue)
 	}
 }
+
+// TestRecordTradeResult_WinLossAccumulation verifies that TotalWinUSD and TotalLossUSD
+// accumulate correctly across wins and losses.
+func TestRecordTradeResult_WinLossAccumulation(t *testing.T) {
+	r := newRiskState(todayUTC(), 0)
+
+	RecordTradeResult(&r, 200.0)  // win
+	RecordTradeResult(&r, -50.0)  // loss
+	RecordTradeResult(&r, 100.0)  // win
+	RecordTradeResult(&r, -30.0)  // loss
+	RecordTradeResult(&r, 0.0)    // breakeven (counts as win)
+
+	if r.WinningTrades != 3 {
+		t.Errorf("expected WinningTrades=3; got %d", r.WinningTrades)
+	}
+	if r.LosingTrades != 2 {
+		t.Errorf("expected LosingTrades=2; got %d", r.LosingTrades)
+	}
+	if r.TotalWinUSD != 300.0 {
+		t.Errorf("expected TotalWinUSD=300; got %.2f", r.TotalWinUSD)
+	}
+	if r.TotalLossUSD != 80.0 {
+		t.Errorf("expected TotalLossUSD=80; got %.2f", r.TotalLossUSD)
+	}
+}
+
+// TestComputePositionSizeFraction_DefaultBeforeKelly verifies the full 95% base
+// fraction is used when fewer than 30 trades have been recorded and no drawdown
+// or correlation pressure is present.
+func TestComputePositionSizeFraction_DefaultBeforeKelly(t *testing.T) {
+	r := RiskState{TotalTrades: 10}
+	frac := ComputePositionSizeFraction(&r, 1.0)
+	if frac != 0.95 {
+		t.Errorf("expected 0.95 before kelly threshold; got %.4f", frac)
+	}
+}
+
+// TestComputePositionSizeFraction_KellyPositiveExpectancy verifies that a strategy
+// with good win-rate & avg-win is scaled down to quarter-Kelly, not the full 95%.
+func TestComputePositionSizeFraction_KellyPositiveExpectancy(t *testing.T) {
+	// Win rate = 60%, avg win = $200, avg loss = $100 → b=2, Kelly = (0.6*2-0.4)/2 = 0.4
+	// Quarter-Kelly = 0.10, which is less than 0.95.
+	r := RiskState{
+		TotalTrades:   50,
+		WinningTrades: 30,
+		LosingTrades:  20,
+		TotalWinUSD:   6000.0, // avg win $200
+		TotalLossUSD:  2000.0, // avg loss $100
+	}
+	frac := ComputePositionSizeFraction(&r, 1.0)
+	// Quarter-Kelly = 0.4 * 0.25 = 0.10
+	if frac < 0.09 || frac > 0.11 {
+		t.Errorf("expected quarter-Kelly ≈ 0.10; got %.4f", frac)
+	}
+}
+
+// TestComputePositionSizeFraction_NegativeKellyUsesMinimum verifies that a losing
+// strategy (negative Kelly) falls back to the 5% minimum.
+func TestComputePositionSizeFraction_NegativeKellyUsesMinimum(t *testing.T) {
+	// Win rate = 30%, avg win = $50, avg loss = $200 → b=0.25, Kelly = (0.3*0.25-0.7)/0.25 = -2.5
+	r := RiskState{
+		TotalTrades:   50,
+		WinningTrades: 15,
+		LosingTrades:  35,
+		TotalWinUSD:   750.0,  // avg win $50
+		TotalLossUSD:  7000.0, // avg loss $200
+	}
+	frac := ComputePositionSizeFraction(&r, 1.0)
+	if frac != 0.05 {
+		t.Errorf("expected 0.05 minimum for negative-Kelly strategy; got %.4f", frac)
+	}
+}
+
+// TestComputePositionSizeFraction_DrawdownScaling verifies that 10–20% drawdown
+// scales to 75% of base and >20% scales to 50% of base.
+func TestComputePositionSizeFraction_DrawdownScaling(t *testing.T) {
+	// Fewer than 30 trades so Kelly doesn't engage; base = 0.95.
+	r15 := RiskState{TotalTrades: 5, CurrentDrawdownPct: 15.0}
+	frac15 := ComputePositionSizeFraction(&r15, 1.0)
+	expected15 := 0.95 * 0.75
+	if frac15 < expected15-0.001 || frac15 > expected15+0.001 {
+		t.Errorf("expected %.4f at 15%% drawdown; got %.4f", expected15, frac15)
+	}
+
+	r25 := RiskState{TotalTrades: 5, CurrentDrawdownPct: 25.0}
+	frac25 := ComputePositionSizeFraction(&r25, 1.0)
+	expected25 := 0.95 * 0.50
+	if frac25 < expected25-0.001 || frac25 > expected25+0.001 {
+		t.Errorf("expected %.4f at 25%% drawdown; got %.4f", expected25, frac25)
+	}
+}
+
+// TestComputePositionSizeFraction_CorrelationMultiplier verifies that a corrMult < 1
+// further reduces the position fraction, and corrMult=0 defaults to 1.
+func TestComputePositionSizeFraction_CorrelationMultiplier(t *testing.T) {
+	r := RiskState{TotalTrades: 5} // no Kelly, no drawdown → base 0.95
+
+	frac50 := ComputePositionSizeFraction(&r, 0.50)
+	expected50 := 0.95 * 0.50
+	if frac50 < expected50-0.001 || frac50 > expected50+0.001 {
+		t.Errorf("expected %.4f with corrMult=0.5; got %.4f", expected50, frac50)
+	}
+
+	// corrMult=0 should behave like 1.0 (no penalty), not clamp everything to min.
+	fracZero := ComputePositionSizeFraction(&r, 0.0)
+	if fracZero != 0.95 {
+		t.Errorf("expected 0.95 when corrMult=0 (defaults to 1.0); got %.4f", fracZero)
+	}
+}
+
+// TestComputePositionSizeFraction_Clamp verifies the output never exceeds 0.95
+// and never falls below 0.05.
+func TestComputePositionSizeFraction_Clamp(t *testing.T) {
+	// Very aggressive Kelly would push above 0.95 without clamping.
+	r := RiskState{
+		TotalTrades:   100,
+		WinningTrades: 99,
+		LosingTrades:  1,
+		TotalWinUSD:   9900.0,
+		TotalLossUSD:  1.0,
+	}
+	frac := ComputePositionSizeFraction(&r, 1.0)
+	if frac > 0.95 {
+		t.Errorf("expected fraction clamped to 0.95 max; got %.4f", frac)
+	}
+
+	// Drawdown + tiny corrMult could push below 0.05 without clamping.
+	rLow := RiskState{TotalTrades: 5, CurrentDrawdownPct: 25.0}
+	fracLow := ComputePositionSizeFraction(&rLow, 0.01)
+	if fracLow < 0.05 {
+		t.Errorf("expected fraction clamped to 0.05 min; got %.4f", fracLow)
+	}
+}
