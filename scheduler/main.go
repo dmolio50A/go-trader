@@ -455,12 +455,25 @@ func main() {
 					mu.Lock()
 					state.PortfolioRisk.KillSwitchActive = false
 					state.PortfolioRisk.KillSwitchAt = time.Time{}
-					addKillSwitchEvent(&state.PortfolioRisk, "reset", state.PortfolioRisk.CurrentDrawdownPct, 0, state.PortfolioRisk.PeakValue, "manual reset via DM")
+					// Reset peak to current portfolio value so drawdown is measured
+					// from the reset point, not the old high-water mark.
+					// Without this the kill switch would re-fire immediately on the
+					// next cycle since current drawdown still exceeds the threshold.
+					newPeak := 0.0
+					for _, sc := range cfg.Strategies {
+						if s, ok := state.Strategies[sc.ID]; ok {
+							newPeak += PortfolioValue(s, prices)
+						}
+					}
+					state.PortfolioRisk.PeakValue = newPeak
+					state.PortfolioRisk.CurrentDrawdownPct = 0
+					state.PortfolioRisk.WarningSent = false
+					addKillSwitchEvent(&state.PortfolioRisk, "reset", 0, newPeak, newPeak, "manual reset via DM — peak rebased to current value")
 					if err := SaveStateWithDB(state, cfg, stateDB); err != nil {
 						fmt.Printf("[CRITICAL] Failed to save state after kill switch reset: %v\n", err)
 					}
 					mu.Unlock()
-					notifier.SendOwnerDM("Kill switch reset. Trading will resume next cycle.")
+					notifier.SendOwnerDM(fmt.Sprintf("Kill switch reset. Peak rebased to $%.2f. Trading will resume next cycle.", newPeak))
 					fmt.Println("[update] Kill switch reset by owner via DM")
 				}()
 			}
